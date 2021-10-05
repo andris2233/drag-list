@@ -12,7 +12,7 @@
       class="list__item"
       :list-rect="clientRect"
       :class="{ 'list__item_dragged': isOnDrag && item === draggedElement }"
-      @mousedown="onStartDrag($event, item, index)"
+      @mousedown.stop="onStartDrag($event, item, index)"
     >
       <span>{{ item.title }}</span>
       <h2 v-if="item.id === 2">{{ item.title }}</h2>
@@ -47,11 +47,8 @@ export default {
         x: 0,
         y: 0,
         offsetY: 0,
+        offsetX: 0,
         width: 0,
-      },
-      foundPosition: {
-        x: 0,
-        y: 0,
       },
       draggedElement: null,
       isDownDirection: true,
@@ -63,6 +60,7 @@ export default {
     itemPosition() {
       return {
         top: `${this.position.y}px`,
+        left: `${this.position.x}px`,
         transition: this.isOnDrag ? 'none' : 'all 0.1s',
         width: `${this.position.width}px`,
       };
@@ -70,15 +68,19 @@ export default {
   },
   methods: {
     changePosition(ev) {
-      // debugger;
-      const { position, foundPosition } = this;
-      const offsetY = ev.clientY - ev.currentTarget.getBoundingClientRect().top;
-      // eslint-disable-next-line no-multi-assign
-      foundPosition.x = position.x = ev.pageX;
+      const { position } = this;
+      const rect = ev.currentTarget.getBoundingClientRect();
+
+      const offsetY = ev.clientY - rect.top;
+      const offsetX = ev.clientX - rect.left;
+
       position.offsetY = offsetY;
+      position.offsetX = offsetX;
+
       position.width = ev.currentTarget.clientWidth;
-      // eslint-disable-next-line no-multi-assign
-      foundPosition.y = position.y = ev.pageY - offsetY;
+
+      position.x = ev.pageX - offsetX;
+      position.y = ev.pageY - offsetY;
     },
 
     onStartDrag(ev, item, index) {
@@ -93,7 +95,11 @@ export default {
       if (this.isOnDrag) {
         this.canDrag = false;
         this.isOnDrag = false;
-        this.position.y = this.$refs[`item${this.draggedElement.id}`][0].getBoundingClientRect().top;
+
+        const rect = this.$refs[`item${this.draggedElement.id}`][0].getBoundingClientRect();
+        this.position.y = rect.top;
+        this.position.x = rect.left;
+
         setTimeout(() => {
           this.canDrag = true;
           this.draggedIndex = -1;
@@ -132,7 +138,6 @@ export default {
       if (this.draggedElement.id === id) return;
       const draggedIdx = this.items.findIndex((item) => item.id === this.draggedElement.id);
       const switchedIdx = this.items.findIndex((item) => item.id === id);
-      this.foundPosition.y = this.$refs[`item${id}`][0].getBoundingClientRect().top;
       const el = this.items[draggedIdx];
       this.items[draggedIdx] = this.items[switchedIdx];
       this.items[switchedIdx] = el;
@@ -144,6 +149,7 @@ export default {
         const newVerticalPosition = ev.y - this.position.offsetY;
         this.isDownDirection = newVerticalPosition > this.position.y;
         this.position.y = newVerticalPosition;
+        this.position.x = ev.x - this.position.offsetX;
         this.switch();
       }
     },
