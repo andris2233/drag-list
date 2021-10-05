@@ -6,17 +6,18 @@
     class="list"
   >
     <li
-      v-for="item of items"
+      v-for="(item, index) of items"
       :ref="`item${item.id}`"
       :key="item.id"
       class="list__item"
       :list-rect="clientRect"
       :class="{ 'list__item_dragged': isOnDrag && item === draggedElement }"
-      @mousedown="onStartDrag($event, item)"
+      @mousedown="onStartDrag($event, item, index)"
     >
       <span>{{ item.title }}</span>
       <h2 v-if="item.id === 2">{{ item.title }}</h2>
     </li>
+
     <li
       v-if="draggedElement"
       :key="`${draggedElement.id}-copy`"
@@ -46,65 +47,84 @@ export default {
         x: 0,
         y: 0,
         offsetY: 0,
+        width: 0,
       },
       foundPosition: {
         x: 0,
         y: 0,
       },
       draggedElement: null,
+      isDownDirection: true,
+      draggedIndex: -1,
+      canDrag: true,
     };
   },
   computed: {
     itemPosition() {
       return {
         top: `${this.position.y}px`,
-        transition: 'none',
+        transition: this.isOnDrag ? 'none' : 'all 0.1s',
+        width: `${this.position.width}px`,
       };
     },
   },
   methods: {
     changePosition(ev) {
+      // debugger;
       const { position, foundPosition } = this;
+      const offsetY = ev.clientY - ev.currentTarget.getBoundingClientRect().top;
       // eslint-disable-next-line no-multi-assign
       foundPosition.x = position.x = ev.pageX;
-      position.offsetY = ev.offsetY;
+      position.offsetY = offsetY;
+      position.width = ev.currentTarget.clientWidth;
       // eslint-disable-next-line no-multi-assign
-      foundPosition.y = position.y = ev.pageY - ev.offsetY;
+      foundPosition.y = position.y = ev.pageY - offsetY;
     },
 
-    onStartDrag(ev, item) {
+    onStartDrag(ev, item, index) {
+      if (!this.canDrag) return;
       this.changePosition(ev);
       this.draggedElement = item;
       this.isOnDrag = true;
+      this.draggedIndex = index;
     },
 
     onEndDrag() {
       if (this.isOnDrag) {
+        this.canDrag = false;
         this.isOnDrag = false;
-        this.position.y = this.foundPosition.y;
+        this.position.y = this.$refs[`item${this.draggedElement.id}`][0].getBoundingClientRect().top;
         setTimeout(() => {
+          this.canDrag = true;
+          this.draggedIndex = -1;
           this.draggedElement = null;
-        }, 200);
+        }, 300);
       }
     },
 
     switch() {
       let heightSum = 0;
-      let id = null;
-      // eslint-disable-next-line no-restricted-syntax
-      for (const item of this.items) {
-        const currentHeight = this.$refs[`item${item.id}`][0].clientHeight;
-        id = item.id;
-        if (heightSum + currentHeight < this.position.y) {
-          heightSum += currentHeight;
-          id = item.id;
-        } else {
-          this.switchElements(id);
-          return;
+
+      if (this.isDownDirection) {
+        if (this.draggedIndex === this.items.length - 1) return;
+
+        for (let i = 0; i <= this.draggedIndex; i += 1) {
+          heightSum += this.$refs[`item${this.items[i].id}`][0].clientHeight;
         }
-      }
-      if (id) {
-        this.switchElements(id);
+
+        if (this.position.y > heightSum) {
+          this.switchElements(this.items[this.draggedIndex + 1].id);
+        }
+      } else {
+        if (this.draggedIndex === 0) return;
+
+        for (let i = 0; i <= this.draggedIndex - 1; i += 1) {
+          heightSum += this.$refs[`item${this.items[i].id}`][0].clientHeight;
+        }
+
+        if (this.position.y < heightSum) {
+          this.switchElements(this.items[this.draggedIndex - 1].id);
+        }
       }
     },
 
@@ -116,11 +136,14 @@ export default {
       const el = this.items[draggedIdx];
       this.items[draggedIdx] = this.items[switchedIdx];
       this.items[switchedIdx] = el;
+      this.draggedIndex += draggedIdx < switchedIdx ? 1 : -1;
     },
 
     onMoveItem(ev) {
       if (this.isOnDrag) {
-        this.position.y = ev.y - this.position.offsetY;
+        const newVerticalPosition = ev.y - this.position.offsetY;
+        this.isDownDirection = newVerticalPosition > this.position.y;
+        this.position.y = newVerticalPosition;
         this.switch();
       }
     },
@@ -138,6 +161,7 @@ export default {
     flex-direction: column;
     list-style: none;
     padding: 0;
+    width: 300px;
     & > .list__item {
       margin-bottom: 10px;
     }
@@ -159,10 +183,10 @@ export default {
       &_copy {
         position: fixed;
         z-index: 1000;
-        width: 100%;
         cursor: move;
         transition: none;
-        outline:  1px solid aqua;
+        outline: 1px solid aqua;
+        box-sizing: border-box;
       }
     }
   }
