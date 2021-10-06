@@ -1,4 +1,4 @@
-# list-vk
+# drag-list
 
 ## Project setup
 ```
